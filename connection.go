@@ -2299,12 +2299,23 @@ func (s *connection) SendMessage(p []byte) error {
 	if !s.supportsDatagrams() {
 		return errors.New("datagram support disabled")
 	}
-
-	f := &wire.DatagramFrame{DataLenPresent: true}
+	var f *wire.DatagramFrame
+	if protocol.ByteCount(len(p)) < protocol.MaxDatagramFrameSize {
+		// if protocol.ByteCount(len(p)) < 0 {
+		f = wire.GetDatagramFrame()
+		f.Data = f.Data[:len(p)]
+	} else {
+		f = &wire.DatagramFrame{DataLenPresent: true}
+		f.Data = make([]byte, len(p))
+	}
+	f.DataLenPresent = true
+	// f := &wire.DatagramFrame{DataLenPresent: true}
 	if protocol.ByteCount(len(p)) > f.MaxDataLen(s.peerParams.MaxDatagramFrameSize, s.version) {
 		return errors.New("message too large")
 	}
-	f.Data = make([]byte, len(p))
+	if f.Data == nil {
+		f.Data = make([]byte, len(p))
+	}
 	copy(f.Data, p)
 	return s.datagramQueue.AddAndWait(f)
 }

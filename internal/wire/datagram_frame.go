@@ -12,6 +12,7 @@ import (
 type DatagramFrame struct {
 	DataLenPresent bool
 	Data           []byte
+	fromPool       bool
 }
 
 func parseDatagramFrame(r *bytes.Reader, typ uint64, _ protocol.VersionNumber) (*DatagramFrame, error) {
@@ -77,4 +78,8 @@ func (f *DatagramFrame) Length(_ protocol.VersionNumber) protocol.ByteCount {
 		length += quicvarint.Len(uint64(len(f.Data)))
 	}
 	return length
+}
+
+func (f *DatagramFrame) PutBack() {
+	putDatagramFrame(f)
 }

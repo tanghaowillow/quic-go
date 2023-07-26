@@ -124,3 +124,12 @@ func (h *datagramQueue) CloseWithError(e error) {
 	h.closeErr = e
 	close(h.closed)
 }
+
+type datagramFrameAckHandler struct{}
+
+func (*datagramFrameAckHandler) OnAcked(f wire.Frame) {
+	f.(*wire.DatagramFrame).PutBack()
+}
+
+func (*datagramFrameAckHandler) OnLost(f wire.Frame) {
+}

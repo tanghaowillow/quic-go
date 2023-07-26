@@ -593,7 +593,7 @@ func (p *packetPacker) composeNextPacket(maxFrameSize protocol.ByteCount, onlyAc
 		if f := p.datagramQueue.Peek(); f != nil {
 			size := f.Length(v)
 			if size <= maxFrameSize-pl.length {
-				pl.frames = append(pl.frames, ackhandler.Frame{Frame: f})
+				pl.frames = append(pl.frames, ackhandler.Frame{Frame: f, Handler: &datagramFrameAckHandler{}})
 				pl.length += size
 				p.datagramQueue.Pop()
 			}

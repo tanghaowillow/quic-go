@@ -16,11 +16,11 @@ type DatagramFrame struct {
 }
 
 func parseDatagramFrame(r *bytes.Reader, typ uint64, _ protocol.VersionNumber) (*DatagramFrame, error) {
-	f := &DatagramFrame{}
-	f.DataLenPresent = typ&0x1 > 0
+	var f *DatagramFrame
+	DataLenPresent := typ&0x1 > 0
 
 	var length uint64
-	if f.DataLenPresent {
+	if DataLenPresent {
 		var err error
 		len, err := quicvarint.Read(r)
 		if err != nil {
@@ -33,7 +33,16 @@ func parseDatagramFrame(r *bytes.Reader, typ uint64, _ protocol.VersionNumber) (
 	} else {
 		length = uint64(r.Len())
 	}
-	f.Data = make([]byte, length)
+
+	if protocol.ByteCount(length) < protocol.MaxDatagramFrameSize {
+		f = GetDatagramFrame()
+	} else {
+		f = &DatagramFrame{
+			Data: make([]byte, length),
+		}
+	}
+	f.DataLenPresent = DataLenPresent
+
 	if _, err := io.ReadFull(r, f.Data); err != nil {
 		return nil, err
 	}

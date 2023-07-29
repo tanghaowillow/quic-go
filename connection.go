@@ -2301,7 +2301,6 @@ func (s *connection) SendMessage(p []byte) error {
 	}
 	var f *wire.DatagramFrame
 	if protocol.ByteCount(len(p)) < protocol.MaxDatagramFrameSize {
-		// if protocol.ByteCount(len(p)) < 0 {
 		f = wire.GetDatagramFrame()
 		f.Data = f.Data[:len(p)]
 	} else {
@@ -2309,7 +2308,6 @@ func (s *connection) SendMessage(p []byte) error {
 		f.Data = make([]byte, len(p))
 	}
 	f.DataLenPresent = true
-	// f := &wire.DatagramFrame{DataLenPresent: true}
 	if protocol.ByteCount(len(p)) > f.MaxDataLen(s.peerParams.MaxDatagramFrameSize, s.version) {
 		return errors.New("message too large")
 	}

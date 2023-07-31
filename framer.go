@@ -11,6 +11,8 @@ import (
 	"github.com/quic-go/quic-go/quicvarint"
 )
 
+const maxDatagramSendQueueLength = 100
+
 type framer interface {
 	HasData() bool
 
@@ -19,6 +21,9 @@ type framer interface {
 
 	AddActiveStream(protocol.StreamID)
 	AppendStreamFrames([]ackhandler.StreamFrame, protocol.ByteCount, protocol.VersionNumber) ([]ackhandler.StreamFrame, protocol.ByteCount)
+
+	QueueDatagramFrame(*wire.DatagramFrame)
+	AppendDatagramFrames([]ackhandler.Frame, protocol.ByteCount, protocol.VersionNumber) ([]ackhandler.Frame, protocol.ByteCount)
 
 	Handle0RTTRejection() error
 }
@@ -33,6 +38,9 @@ type framerI struct {
 
 	controlFrameMutex sync.Mutex
 	controlFrames     []wire.Frame
+
+	datagramFrameMutex sync.Mutex
+	datagramFrames     []*wire.DatagramFrame
 }
 
 var _ framer = &framerI{}
@@ -54,6 +62,12 @@ func (f *framerI) HasData() bool {
 	f.controlFrameMutex.Lock()
 	hasData = len(f.controlFrames) > 0
 	f.controlFrameMutex.Unlock()
+	if hasData {
+		return true
+	}
+	f.datagramFrameMutex.Lock()
+	hasData = len(f.datagramFrames) > 0
+	f.datagramFrameMutex.Unlock()
 	return hasData
 }
 
@@ -135,6 +149,32 @@ func (f *framerI) AppendStreamFrames(frames []ackhandler.StreamFrame, maxLen pro
 		frames[len(frames)-1].Frame.DataLenPresent = false
 		length += frames[len(frames)-1].Frame.Length(v) - l
 	}
+	return frames, length
+}
+
+func (f *framerI) QueueDatagramFrame(frame *wire.DatagramFrame) {
+	f.datagramFrameMutex.Lock()
+	if len(f.datagramFrames) > maxDatagramSendQueueLength {
+		f.datagramFrames = f.datagramFrames[1:]
+	}
+	f.datagramFrames = append(f.datagramFrames, frame)
+	f.datagramFrameMutex.Unlock()
+}
+
+func (f *framerI) AppendDatagramFrames(frames []ackhandler.Frame, maxLen protocol.ByteCount, v protocol.VersionNumber) ([]ackhandler.Frame, protocol.ByteCount) {
+	var length protocol.ByteCount
+	f.datagramFrameMutex.Lock()
+	for len(f.datagramFrames) > 0 {
+		frame := f.datagramFrames[0]
+		frameLen := frame.Length(v)
+		if length+frameLen > maxLen {
+			break
+		}
+		frames = append(frames, ackhandler.Frame{Frame: frame})
+		length += frameLen
+		f.datagramFrames = f.datagramFrames[1:]
+	}
+	f.datagramFrameMutex.Unlock()
 	return frames, length
 }
 

@@ -2318,6 +2318,21 @@ func (s *connection) SendMessage(p []byte) error {
 	return s.datagramQueue.AddAndWait(f)
 }
 
+func (s *connection) SendMessageUnblocking(p []byte) error {
+	if !s.supportsDatagrams() {
+		return errors.New("datagram support disabled")
+	}
+	f := &wire.DatagramFrame{DataLenPresent: true}
+	if protocol.ByteCount(len(p)) > f.MaxDataLen(s.peerParams.MaxDatagramFrameSize, s.version) {
+		return errors.New("message too large")
+	}
+	f.Data = make([]byte, len(p))
+	copy(f.Data, p)
+	s.framer.QueueDatagramFrame(f)
+	s.scheduleSending()
+	return nil
+}
+
 func (s *connection) ReceiveMessage(ctx context.Context) ([]byte, error) {
 	if !s.config.EnableDatagrams {
 		return nil, errors.New("datagram support disabled")

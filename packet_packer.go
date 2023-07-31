@@ -99,6 +99,7 @@ type frameSource interface {
 	HasData() bool
 	AppendStreamFrames([]ackhandler.StreamFrame, protocol.ByteCount, protocol.VersionNumber) ([]ackhandler.StreamFrame, protocol.ByteCount)
 	AppendControlFrames([]ackhandler.Frame, protocol.ByteCount, protocol.VersionNumber) ([]ackhandler.Frame, protocol.ByteCount)
+	AppendDatagramFrames([]ackhandler.Frame, protocol.ByteCount, protocol.VersionNumber) ([]ackhandler.Frame, protocol.ByteCount)
 }
 
 type ackFrameSource interface {
@@ -621,6 +622,7 @@ func (p *packetPacker) composeNextPacket(maxFrameSize protocol.ByteCount, onlyAc
 
 	if hasData {
 		var lengthAdded protocol.ByteCount
+		// control frames
 		startLen := len(pl.frames)
 		pl.frames, lengthAdded = p.framer.AppendControlFrames(pl.frames, maxFrameSize-pl.length, v)
 		pl.length += lengthAdded
@@ -628,6 +630,10 @@ func (p *packetPacker) composeNextPacket(maxFrameSize protocol.ByteCount, onlyAc
 		for i := startLen; i < len(pl.frames); i++ {
 			pl.frames[i].Handler = p.retransmissionQueue.AppDataAckHandler()
 		}
+
+		// datagram frames
+		pl.frames, lengthAdded = p.framer.AppendDatagramFrames(pl.frames, maxFrameSize-pl.length, v)
+		pl.length += lengthAdded
 
 		pl.streamFrames, lengthAdded = p.framer.AppendStreamFrames(pl.streamFrames, maxFrameSize-pl.length, v)
 		pl.length += lengthAdded
